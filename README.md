@@ -6,7 +6,7 @@ Sbírka mých [Claude Code](https://claude.com/claude-code) skillů. Každá pod
 
 | Skill | Popis |
 |-------|-------|
-| [`zaznamenej`](zaznamenej/) | Session wrap-up — audit změn od posledního zápisu do dokumentace a draft updatů do projektových `.md` souborů (CLAUDE.md, docs/). Spouští se ručně na konci práce přes `/zaznamenej`. |
+| [`zaznamenej`](zaznamenej/) | Session wrap-up — audit změn od posledního zápisu a draft updatů do vrstvené dokumentace: rolling stav (CLAUDE.md), aktivní okno (HISTORY.md), durable lekce (LESSONS.md), tematické docs/. Spouští se ručně přes `/zaznamenej`. |
 | [`merge`](merge/) | Race-safe merge → deploy jednoho PR: rebase na `origin/main`, čekání na green CI, squash-merge + smazání branche, pak deploy tail dle konvence projektu. Náhrada za merge queue zamčenou na free planu + privátním repu (403). |
 | [`handover`](handover/) | Sepíše ready-to-paste prompt pro novou Claude Code session, aby navázala bez ztráty kontextu — stav repa, foundation skip-list, příští úkol. Default inline, u velkého kontextu soubor v `~/.claude/plans/`. |
 
