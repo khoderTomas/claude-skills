@@ -7,6 +7,8 @@ Sbírka mých [Claude Code](https://claude.com/claude-code) skillů. Každá pod
 | Skill | Popis |
 |-------|-------|
 | [`zaznamenej`](zaznamenej/) | Session wrap-up — audit změn od posledního zápisu do dokumentace a draft updatů do projektových `.md` souborů (CLAUDE.md, docs/). Spouští se ručně na konci práce přes `/zaznamenej`. |
+| [`merge`](merge/) | Race-safe merge → deploy jednoho PR: rebase na `origin/main`, čekání na green CI, squash-merge + smazání branche, pak deploy tail dle konvence projektu. Náhrada za merge queue zamčenou na free planu + privátním repu (403). |
+| [`handover`](handover/) | Sepíše ready-to-paste prompt pro novou Claude Code session, aby navázala bez ztráty kontextu — stav repa, foundation skip-list, příští úkol. Default inline, u velkého kontextu soubor v `~/.claude/plans/`. |
 
 ## Instalace
 
@@ -16,11 +18,16 @@ Zkopíruj složku skillu do `~/.claude/skills/` (globálně pro všechny projekt
 cp -r zaznamenej ~/.claude/skills/
 ```
 
-Pak v Claude Code spusť `/zaznamenej`.
+Pak v Claude Code spusť `/zaznamenej` (resp. `/merge`, `/handover`).
 
-## Poznámka
+## Poznámky
 
-Skilly můžou v textu odkazovat na další moje skilly (např. `/handover`), které nejsou součástí tohoto repa — takové odkazy jsou označené jako volitelné a skill funguje i bez nich.
+- Skilly můžou v textu odkazovat na další moje skilly (např. `/handover`), které mají vlastní podsložku v tomto repu, nebo na skilly mimo repo — takové odkazy jsou označené jako volitelné a skill funguje i bez nich.
+- **`merge`** počítá s několika konvencemi a doplaď si je dle svého setupu:
+  - repo nastavené na **squash merge + delete branch**;
+  - deploy tail buď `scripts/post-merge-deploy.sh` v projektu, nebo `.github/workflows/deploy.yml` (auto-deploy přes Actions), jinak manuální;
+  - `allowed-tools` v `merge/SKILL.md` odkazuje na `~/.claude/skills/merge/lib/pr-merge.sh` — pokud skill nainstaluješ jinam, cestu uprav;
+  - používá in-session nástroj `ExitWorktree` (volitelné, jen při práci v git worktree).
 
 ## Licence
 
