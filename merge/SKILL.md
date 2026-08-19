@@ -3,6 +3,8 @@ name: merge
 description: Race-safe merge → deploy jednoho PR v libovolném projektu. Rebasne feature branch na nejnovější origin/main, počká na green CI, squash-merguje a smaže branch, pak spustí projektový deploy tail podle konvence — s jasnými STOP body (rebase konflikt, červené CI, preflight fail). Použij když je feature hotová a chceš ji bezpečně domergovat a nasadit. Náhrada za GitHub merge queue, který je na free planu + privátním repu zamčený (403).
 argument-hint: <PR-number>
 user-invocable: true
+model: sonnet
+effort: low
 allowed-tools: Bash(bash ~/.claude/skills/merge/lib/pr-merge.sh:*), Bash(bash scripts/post-merge-deploy.sh:*), Bash(gh pr view:*), Bash(gh pr checks:*), Bash(gh repo view:*), Bash(git rev-parse:*), Bash(git status:*), Bash(git checkout:*), Bash(git pull:*), Bash(git branch:*), ExitWorktree
 ---
 
@@ -45,7 +47,30 @@ Spusť (repo si skript autodetekuje):
 bash ~/.claude/skills/merge/lib/pr-merge.sh <PR#>
 ```
 Dělá: čistota → rebase na `origin/main` → push `--force-with-lease` →
-`gh pr checks --watch` → `gh pr merge --squash --delete-branch`.
+čekání na CI vázané na **přesný HEAD SHA** (vlastní poll na check-runs; `gh pr
+checks --watch` umí po force-pushi vrátit stale výsledky předchozího SHA) →
+`gh pr merge --squash --delete-branch` → doclosování issues, které GitHub
+nezavře sám.
+
+**Docs-only diff**: když PR mění jen docs/meta soubory a repo má v CI
+`paths-ignore`, žádný check-run nikdy nevznikne — skript proto čeká jen krátké
+grace okno místo plného 15min stropu. Objeví-li se check-run přesto, přepne
+zpět na plné čekání; prázdný/nespočitatelný diff čeká plný strop (fail-closed).
+
+**Doclosování**: GitHub zavírá issues jen na anglické keywordy
+(`closes/fixes/resolves`). Česky psané „Uzavírá #N" vypadá jako uzávěr, ale
+GitHub ho ignoruje a issue po mergi tiše zůstane otevřené. Skript proto porovná
+`closingIssuesReferences` (co GitHub zavře sám) s českým uzavíracím záměrem
+v textu PR a rozdíl dořeší:
+
+- **jednoznačný uzávěr** („Uzavírá / Zavře / Uzavřeno" + `#N`) → zavře sám po
+  mergi, s komentářem proč; zavírá jen to, co je v tu chvíli `OPEN`, takže
+  zastaralá zmínka na už zavřené issue nic neudělá;
+- **slabší formulace** („Řeší / Opravuje / Implementuje" + `#N`) → jen vypíše
+  jako upozornění, protože můžou znamenat i částečné řešení.
+
+Nic z toho merge neblokuje a všechno se vypisuje — když skript něco zavřel, je
+to v jeho výstupu a `gh issue reopen` to vrátí.
 
 🛑 **STOP, když skript skončí non-zero:**
 - exit 2 = **rebase konflikt** → vyřeš ručně (`git rebase origin/main` → resolve → `--continue`), pak `/merge <PR#>` znovu. NIKDY neřeš konflikt na slepo.
@@ -81,8 +106,10 @@ Vyber PRVNÍ, co platí:
    ale deploy si musí spustit sám (a navrhni doplnit `scripts/post-merge-deploy.sh`).
 
 ## Krok 4 — smoke + watch (ty, ne skript)
-- **Smoke-check sám** přes Playwright harness (capture konzole + network do souboru,
-  přečti výsledek) na 1–2 klíčových routách (dotčená feature + home). Chyby ber z capture, ne z dialogů.
+- **Smoke-check proběhne vždy** — nežádej ownera o reprodukci. Přes Playwright
+  harness (capture konzole + network do souboru, přečti výsledek) na 1–2 klíčových
+  routách (dotčená feature + home); máš-li na to subagenta, deleguj. Chyby ber
+  z capture, **ne z dialogů** — dialog se zavře dřív, než ho stihneš přečíst.
 - Připomeň **post-deploy watch** dle konvence projektu (např. sledování chyb v monitoringu, smoke test ve workflow).
 - Vypiš shrnutí: PR #, repo, co nasazeno, výsledek smoke.
 
