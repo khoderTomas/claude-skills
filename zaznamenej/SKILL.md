@@ -1,6 +1,8 @@
 ---
 name: zaznamenej
 description: Session wrap-up pro libovolný projekt — audit změn od posledního zápisu, draft updatů do vrstvené projektové dokumentace (CLAUDE.md = rolling stav, HISTORY.md = aktivní okno, LESSONS.md = durable lekce, docs/), apply po schválení. Invoke explicit (`/zaznamenej`) na konci work session. Pokud má projekt vlastní kopii skillu, použije ji; tahle je generický fallback.
+model: sonnet
+effort: medium
 ---
 
 # /zaznamenej — generický session wrap-up
@@ -33,8 +35,9 @@ Rozděl zápis podle životnosti — co je rolling stav, co aktivní historie, c
 4. **Draft durable lekcí.** Co se rozbilo/zjistilo a co dělat jinak → `docs/LESSONS.md` do tematické sekce (formát níže). Zápis v HISTORY drží jen jednořádkový pointer na lekci.
 5. **Najdi další dotčené docs.** Tematické `docs/*.md` dle scope změny (architektura, deploy, API…), `.env.example` u nového env varu. Co projekt nemá, nevytvářej bez návrhu.
 6. **Draft proposal.** Ukaž stručně: které soubory, jaké změny, plné znění nových odstavců. Texty piš věcně — žádný AI-marketing sloh (případně prožeň skillem na humanizaci, máš-li). V auto mode aplikuj rovnou a referuj.
-7. **Apply po OK.** Commit dokumentace zvlášť (`docs: zaznamenej YYYY-MM-DD — <shrnutí>`). Nedodělky → `gh issue create` (pokud projekt používá GitHub), jinak TODO sekce v docs. Práce pokračuje → nabídni handover prompt (máš-li skill `/handover`).
-8. **Memory.** Poznatek přesahující projekt (infra vzor, preference uživatele) → navrhni zápis do `~/.claude/memory/` + řádek do MEMORY.md indexu.
+7. **Apply po OK.** Commit dokumentace zvlášť (`docs: zaznamenej YYYY-MM-DD — <shrnutí>`).
+8. **Follow-upy.** `/zaznamenej` **není místo, kde se zakládají issues na dluh** — nedodělaný edge case nebo chybějící test z dnešní práce se dodělá, ne odloží. Pokud takový dluh při auditu najdeš, vypiš ho jako **blokující nález** a zeptej se, jestli ho dodělat teď. Novou práci objevenou během session (feature/vylepšení, které existovalo i bez ní) vypiš jako seznam návrhů; `gh issue create` až po explicitním OK usera, s odkazem na task, ze kterého vznikla. Pokud práce pokračuje v nové session, nabídni handover prompt (máš-li skill `/handover`).
+9. **Memory.** Poznatek přesahující projekt (infra vzor, preference uživatele) → navrhni zápis do `~/.claude/memory/` + řádek do MEMORY.md indexu.
 
 ## Formát zápisu (kompaktní, cíl ≤20 řádků)
 

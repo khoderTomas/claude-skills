@@ -33,9 +33,23 @@ Vytvoří node_modules **junction** na main repo (instant, bez kopírování), p
 unikátní dev **PORT** (3110–3199), zapíše řádek do registru `.claude/worktree-registry.md`
 (gitignored, sdílený napříč okny) a vypíše přehled ostatních worktrees.
 
+## Krok 2.5 — recon (PŘED psaním kódu)
+Spusť read-only průzkumného subagenta (built-in `Explore`, nebo vlastní) se zadáním
+feature. Vrátí mapu dotčených souborů, nejbližší precedent ke zkopírování, kontrakty
+v cestě a testy — místo 15–30 Grep/Read kroků v hlavní smyčce.
+
+**Pořadí je zásadní:** recon musí běžet **teď**, dokud je kontext malý — ve velkém
+kontextu už většinu své výhody ztratil. Mapa je výchozí bod, ne hranice: začni podle
+ní, ale čti dál, když ti nesedí; kritické kontrakty (bezpečnostní hranice, finanční
+formule) ověř sám. Přeskoč krok jen u změny, kde přesně víš, které soubory edituješ.
+
 ## Krok 3 — pracuj na zadání
 Pokračuj v `$ARGUMENTS`. Pro plánování přejdi do Plan mode (ve VS Code: klikni na mode
 indikátor dole v promptu; v CLI: Shift+Tab). Dev server (Node): `npm run dev -- -p <PORT z kroku 2>`.
+
+Plán, rozhodnutí a editaci kódu dělá **hlavní smyčka**, ne agenti. Ověřovací běhy
+(lint, typecheck, testy) po každém uceleném balíčku klidně deleguj na subagenta,
+který vrátí jen selhání — ale **fixy děláš ty**, abys viděl diff, který půjde do PR.
 
 ## Krok 4 — úklid (až po commitu + push/PR)
 🛑 **NEpoužívej `ExitWorktree action:"remove"` dokud existuje node_modules junction** — interně

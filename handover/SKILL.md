@@ -1,6 +1,8 @@
 ---
 name: handover
 description: Sepiš ready-to-paste prompt pre novou Claude Code session co navazuje na aktuální práci. Default inline (≤2000 znaků); pokud kontext příliš velký, vytvoř handover soubor v ~/.claude/plans/ + reference v inline promptu. Use when user invokes /handover.
+model: sonnet
+effort: medium
 allowed-tools:
   - Bash
   - Read
@@ -26,14 +28,23 @@ Pokud conversation context **je ambiguous** (multiple plausible next tasks, žá
 
 ## Sběr kontextu (proveď nejdřív, paralelně přes single message)
 
+🚦 **Máš-li read-only subagenta na sběr git stavu, deleguj kroky 1 + 3–6 na něj.**
+/handover se často invokuje u konce kontextu — přesně tehdy, kdy je každý krok
+nejdražší; agent vrátí commity, PRs, issues a worktree sweep jako hotové tabulky
+v jednom kroku. Bez agenta spusť příkazy sám, paralelně:
+
 1. `git log --oneline -10` — recent commits
-2. `git branch --show-current` + `git status -s` — current state
+2. `git branch --show-current` + `git status -s` — current state (tohle si dojdi vždy sám — je to stav TÉHLE session)
 3. `git worktree list` — active parallel work
 4. **Sibling worktree health sweep**: pro každou non-current worktree (mimo main repo root) → `git -C <path> status --porcelain` + `git -C <path> stash list | wc -l`. Stale WIP v sibling worktree se snadno přehlédne — staged změny, které přežijí PR ship, se najdou jen forenzně. Pokud non-empty, zachyť do sekce 3.7 níže.
 5. `gh pr list --state merged --limit 5 --json number,title,mergedAt --repo <owner>/<repo>` — recent ships
 6. (volitelné) `gh issue list --state open --limit 8 --label severity:warn --repo <owner>/<repo>` — open work
 
 Repo path = current working dir. Owner/repo extract z `git remote -v` pokud potřeba.
+
+⚠️ **Vlastní psaní handover promptu nedeleguj** — potřebuje kontext session
+(co se zkoušelo, co owner zamítl, kde jsi zůstal), který agent nemá a z gitu
+ho nevyčte.
 
 ## Output strategy
 
