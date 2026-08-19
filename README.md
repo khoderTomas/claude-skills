@@ -31,9 +31,9 @@ Pak v Claude Code spusť `/zaznamenej` (resp. `/merge`, `/handover`).
   - používá in-session nástroj `ExitWorktree` (volitelné, jen při práci v git worktree);
   - doclosování issues cílí na **česky** psané PR descriptions („Uzavírá #N") — pro jiný jazyk uprav `STRONG_RE`/`WEAK_RE` v `lib/pr-merge.sh`, nebo sekci 4b/5b odstraň (merge funguje i bez ní).
 - **`feature`** cílí na **Node projekty na Windows** — provisioning skripty v `feature/lib/` vytváří node_modules junction přes `mklink /J` a dev PORT v `.env.local`. Na jiném OS/stacku uprav `wt-*.sh` (workflow zůstává). Pozn.:
-  - `wt-remove.sh` používej **vždy** místo holého `git worktree remove` — ten na Windows následuje junction a smaže node_modules v main repu;
+  - `wt-remove.sh` používej **vždy** místo holého `git worktree remove` — ten na Windows následuje junction a smaže node_modules v main repu. Navíc před smazáním zastaví procesy patřící worktree (dev server drží adresář zamčený) a odlinkuje reparse pointy, které si Next.js kopíruje do `.next/` — na to potřebuje PowerShell helpery v `lib/_shared/`, kopíruj tedy celou složku `lib/`;
   - cesty v `allowed-tools` a SKILL.md míří na `~/.claude/skills/feature/lib/` — při jiné instalaci uprav;
-  - statusline (`model | branch | worktree | :PORT`) aktivuješ přes `statusLine.command` v settings.json: `bash ~/.claude/skills/feature/lib/wt-statusline.sh`.
+  - statusline (`model | branch | worktree | :PORT | ctx N% | $cost`, od 250k tokenů hint na /handover) aktivuješ přes `statusLine.command` v settings.json: `bash ~/.claude/skills/feature/lib/wt-statusline.sh`; potřebuje `node` v PATH.
 
 ## Licence
 
