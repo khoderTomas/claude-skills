@@ -10,6 +10,7 @@ Sbírka mých [Claude Code](https://claude.com/claude-code) skillů. Každá pod
 | [`merge`](merge/) | Race-safe merge → deploy jednoho PR: rebase na `origin/main`, čekání na green CI vázané na přesný HEAD SHA (žádné stale výsledky po force-pushi; docs-only diff má grace okno), squash-merge + smazání branche, doclosování issues s česky psaným uzavíracím záměrem, pak deploy tail dle konvence projektu. Náhrada za merge queue zamčenou na free planu + privátním repu (403). |
 | [`handover`](handover/) | Sepíše ready-to-paste prompt pro novou Claude Code session, aby navázala bez ztráty kontextu — stav repa, foundation skip-list, příští úkol. Default inline, u velkého kontextu soubor v `~/.claude/plans/`. |
 | [`feature`](feature/) | Rozjede izolovanou práci na funkci v git worktree přímo v session (EnterWorktree → provisioning → práce → bezpečný cleanup). Cílí na Node/Windows: node_modules junction + unikátní dev PORT, ať běží víc oken paralelně. |
+| [`night-shift`](night-shift/) | Autonomní noční směna nad plánem v GitHub issues (checklist / epic se sub-issues / seznam issues). Tenký supervisor drží minimální kontext a na každou jednotku spouští worker subagenta s čerstvým oknem; green verify → commit → odškrtnutí. Failure policy s BLOCKED markery, context guard, řízený stop s push notifikací, ráno draft PR. |
 
 ## Instalace
 
@@ -34,6 +35,11 @@ Pak v Claude Code spusť `/zaznamenej` (resp. `/merge`, `/handover`).
   - `wt-remove.sh` používej **vždy** místo holého `git worktree remove` — ten na Windows následuje junction a smaže node_modules v main repu. Navíc před smazáním zastaví procesy patřící worktree (dev server drží adresář zamčený) a odlinkuje reparse pointy, které si Next.js kopíruje do `.next/` — na to potřebuje PowerShell helpery v `lib/_shared/`, kopíruj tedy celou složku `lib/`;
   - cesty v `allowed-tools` a SKILL.md míří na `~/.claude/skills/feature/lib/` — při jiné instalaci uprav;
   - statusline (`model | branch | worktree | :PORT | ctx N% | $cost`, od 250k tokenů hint na /handover) aktivuješ přes `statusLine.command` v settings.json: `bash ~/.claude/skills/feature/lib/wt-statusline.sh`; potřebuje `node` v PATH.
+- **`night-shift`** předpokládá:
+  - plán v **GitHub issues** (repo s `gh` CLI a auth) — checklist řídicího issue je jediný zdroj stavu, takže pád session nic neztratí;
+  - session spuštěnou v **bypass permissions** přes settings profil (např. `~/.claude/night-settings.json`: bypass + deny na secrets a force push) — preflight se na to ptá a bez potvrzení nespustí smyčku; jediný permission prompt v noci znamená zaseknutou směnu do rána;
+  - in-session nástroje `Agent`, `ScheduleWakeup`, `TaskOutput`/`TaskStop` a `PushNotification` (Claude Code je má built-in);
+  - volitelně vlastní levné subagenty na audit zadání a verify běhy — bez nich skill říká, čím je nahradit.
 
 ## Licence
 
