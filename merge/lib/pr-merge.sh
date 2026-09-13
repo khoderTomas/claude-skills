@@ -10,7 +10,8 @@
 # repu zamčené (403). Race "main se pohnul" proto: rebase na origin/main → green
 # CI → hned squash merge. Solo dev + serializace merge → prakticky eliminováno.
 #
-# STOP (nikdy neforcuje): rebase konflikt (exit 2), červené CI (exit 3).
+# STOP (nikdy neforcuje): rebase konflikt (exit 2), červené CI (exit 3),
+# stacked PR na téhle branchi (exit 4).
 set -euo pipefail
 
 PR="${1:?Usage: pr-merge.sh <PR-number>}"
@@ -44,24 +45,24 @@ git push --force-with-lease origin "$BRANCH"
 # 4. Green CI na rebasnuté hlavě — vázané na PŘESNÝ HEAD SHA.
 #    Pozor: `gh pr checks --watch` umí těsně po force-pushi vrátit STALE výsledky
 #    předchozího SHA (GitHub nový běh ještě neregistroval) → merge by proběhl bez
-#    potvrzeného CI přesně toho kódu (reálný incident po rebase konfliktu).
-#    Proto vlastní poll na check-runs commitu: čeká, až pro HEAD SHA existuje
-#    aspoň jeden check-run a žádný není pending; červený → STOP.
+#    potvrzeného CI přesně toho kódu (incident 2026-07-07, PR #408 po rebase
+#    konfliktu). Proto vlastní poll na check-runs commitu: čeká, až pro HEAD SHA
+#    existuje aspoň jeden check-run a žádný není pending; červený → STOP.
 HEAD_SHA=$(git rev-parse HEAD)
 
 # Docs-only PR? GitHub `paths-ignore` v mnoha repech přeskočí celý CI workflow pro
 # čistě dokumentační/meta diff → žádný check-run se NIKDY nevytvoří a klasické čekání
-# by zbytečně vyčerpalo celý 15min timeout a spadlo exitem 3 (reálný incident:
-# docs-only PR, CI přeskočeno přes paths-ignore, skript timeoutnul). Když všechny
-# změněné soubory vypadají docs/meta, zkrať čekání na krátké grace okno:
+# by zbytečně vyčerpalo celý 15min timeout a spadlo exitem 3 (incident 2026-07-10,
+# PR #1503: docs-only sign-off, CI přeskočeno paths-ignore, merge skript timeoutnul).
+# Když všechny změněné soubory vypadají docs/meta, zkrať čekání na krátké grace okno:
 # neobjeví-li se v něm check-run = záměrný skip → merguj. Objeví-li se (repo, které CI
 # na docs spouští), přepni zpět na plnou smyčku — gate se tím NEobejde.
 CHANGED=$(git diff --name-only origin/main...HEAD)
-# Prázdný seznam = fail-CLOSED. Původně se prázdný `CHANGED` protočil smyčkou bez
-# jediné iterace a nechal DOCS_ONLY=1, takže PR, u kterého diff nešel spočítat
-# (odlišná merge-base, shallow clone, commity už v mainu), dostal 60s grace a
-# mergnul se bez potvrzeného CI. Neznámý diff musí čekat plný strop — grace okno
-# je výjimka pro doloženě docs-only změnu, ne default.
+# Prázdný seznam = fail-CLOSED (#1497). Původně se prázdný `CHANGED` protočil
+# smyčkou bez jediné iterace a nechal DOCS_ONLY=1, takže PR, u kterého diff
+# nešel spočítat (odlišná merge-base, shallow clone, commity už v mainu),
+# dostal 60s grace a mergnul se bez potvrzeného CI. Neznámý diff musí čekat
+# plný strop — grace okno je výjimka pro doloženě docs-only změnu, ne default.
 if [ -z "$CHANGED" ]; then
   DOCS_ONLY=0
   echo "  Prázdný diff proti origin/main — grace okno se NEuplatní (čekám na CI plně)."
@@ -80,10 +81,10 @@ if [ "$DOCS_ONLY" = 1 ]; then
   DEADLINE=$(( $(date +%s) + 60 ))    # grace: check-run naskočí do sekund, nebo nikdy (paths-ignore)
   step "Docs-only diff — grace 60 s na CI (paths-ignore ho nejspíš přeskočí)"
 else
-  DEADLINE=$(( $(date +%s) + 900 ))   # 15 min strop
+  DEADLINE=$(( $(date +%s) + 900 ))   # 15 min strop (ci-box startuje do sekund)
   step "Čekám na CI pro ${HEAD_SHA:0:10}…"
 fi
-# Doložil aspoň jeden ÚSPĚŠNÝ dotaz na check-runs, že tam nic není?
+# Doložil aspoň jeden ÚSPĚŠNÝ dotaz na check-runs, že tam nic není? (#1497)
 # Bez tohohle by síťový blip / rate-limit po celé grace okno vypadal stejně jako
 # „CI záměrně přeskočeno" → merge bez CI kvůli chybě, o které nikdo neví.
 API_OK=0
@@ -126,9 +127,10 @@ done
 # 4b. Uzavírací záměr psaný česky
 #
 # GitHub zavírá issues jen na anglické keywordy (closes/fixes/resolves). České
-# „Uzavírá #42" vypadá v PR jako uzávěr, ale GitHub ho ignoruje — issue po mergi
+# „Uzavírá #913" vypadá v PR jako uzávěr, ale GitHub ho ignoruje — issue po mergi
 # i po nasazení tiše zůstane otevřené a nikdo si toho nevšimne, dokud ho o měsíc
-# později někdo nenajde v backlogu (reálný incident).
+# později někdo nenajde v backlogu (incident 2026-08-18: PR #920 nasazen na tři
+# tenanty, issue #913 pořád OPEN).
 #
 # `closingIssuesReferences` je autoritativní odpověď na „co GitHub zavře sám";
 # doplněk k němu je regex na český záměr. Rozděleno na dvě síly:
@@ -162,6 +164,26 @@ if [ -n "$ORPHANS$WEAK_ORPHANS" ]; then
   if [ -n "$AUTO" ]; then         echo "  GitHub zavře sám:$(list "$AUTO")"; fi
   if [ -n "$ORPHANS" ]; then      echo "  Zavřu po mergi:$(list "$ORPHANS")"; fi
   if [ -n "$WEAK_ORPHANS" ]; then echo "  Jen upozornění (může být částečné, NEzavírám):$(list "$WEAK_ORPHANS")"; fi
+fi
+
+# 4c. Draft PR (goal-loop zakládá PR jako draft) → označit ready, jinak
+#     mergePullRequest padá na "Pull Request is still a draft" (#161, 2026-08-22).
+if [ "$(gh pr view "$PR" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null)" = "true" ]; then
+  step "PR je draft → gh pr ready"
+  gh pr ready "$PR" --repo "$REPO"
+fi
+
+# 4d. Stacked-PR guard —
+#     smazání téhle branche po squashi ZAVŘE NENÁVRATNĚ každou otevřenou PR, která
+#     na ni míří jako base. GitHub ji pak nedovolí ani reopenout ("state cannot be
+#     changed. The <branch> branch has been deleted.") — jediná cesta je nová PR.
+#     Tohle je třetí zdokumentovaný výskyt v historii projektu; kontrola musí
+#     proběhnout PŘED mergem, ne po něm.
+step "Kontrola navazujících (stacked) PR na branch $BRANCH"
+STACKED=$(gh pr list --repo "$REPO" --base "$BRANCH" --state open --json number -q '.[].number' 2>/dev/null || echo "")
+if [ -n "$STACKED" ]; then
+  echo "  Otevřené PR se stejným base ($BRANCH):$(list "$STACKED")" >&2
+  fail "STACKED PR — nejdřív retargetuj: gh pr edit <N> --base main pro každé z:$(list "$STACKED"), pak spusť /merge znovu. Merge SE NEPROVEDL." 4
 fi
 
 # 5. Squash merge + smazat remote branch
